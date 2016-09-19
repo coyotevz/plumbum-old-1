@@ -8,7 +8,7 @@ import time
 import pytest
 from plumbum.config import (
     Configuration, ConfigurationError, Option, IntOption, BoolOption,
-    FloatOption, ListOption, ChoiceOption, PathOption
+    FloatOption, ListOption, ChoiceOption, PathOption, ExtensionOption
 )
 from plumbum.core import Component, ComponentMeta, Interface, implements
 from plumbum.util.file import wait_for_file_mtime_change
@@ -750,19 +750,17 @@ class TestIntegration(BaseTest):
         config.set_defaults()
         config.save()
         with open(self.filename, 'r') as f:
-            self.assertEqual('# -*- coding: utf-8 -*-\n',            f.next())
-            self.assertEqual('\n',                                   f.next())
-            self.assertEqual('[a]\n',                                f.next())
-            self.assertEqual('blah = Blàh!\n',                       f.next())
-            self.assertEqual('choice = -42\n',                       f.next())
-            self.assertEqual('false = disabled\n',                   f.next())
-            self.assertEqual('list = #cc0|4.2|42|0||enabled|disabled|\n',
-                             f.next())
-            self.assertEqual('list-seps = #cc0,4.2,42,0,,enabled,disabled,\n',
-                             f.next())
-            self.assertEqual('none = \n',                            f.next())
-            self.assertEqual('true = enabled\n',                     f.next())
-            self.assertEqual('\n',                                   f.next())
+            assert f.next() == '# -*- coding: utf-8 -*-\n'
+            assert f.next() == '\n'
+            assert f.next() == '[a]\n'
+            assert f.next() == 'blah = Blàh!\n'
+            assert f.next() == 'choice = -42\n'
+            assert f.next() == 'false = disabled\n'
+            assert f.next() == 'list = #cc0|4.2|42|0||enabled|disabled|\n'
+            assert f.next() == 'list-seps = #cc0,4.2,42,0,,enabled,disabled,\n'
+            assert f.next() == 'none = \n'
+            assert f.next() == 'true = enabled\n'
+            assert f.next() == '\n'
             self.assertRaises(StopIteration, f.next)
 
     def test_unicode_option_with_raw_default(self):
@@ -782,17 +780,16 @@ class TestIntegration(BaseTest):
         config.set_defaults()
         config.save()
         with open(self.filename, 'r') as f:
-            self.assertEqual('# -*- coding: utf-8 -*-\n',            f.next())
-            self.assertEqual('\n',                                   f.next())
-            self.assertEqual('[résumé]\n',                           f.next())
-            self.assertEqual('bláh = Blàh!\n',                       f.next())
-            self.assertEqual('chöicé = -42\n',                       f.next())
-            self.assertEqual('fálsé = disabled\n',                   f.next())
-            self.assertEqual('liśt = #ccö|4.2|42|0||enabled|disabled|\n',
-                             f.next())
-            self.assertEqual('nöné = \n',                            f.next())
-            self.assertEqual('trüé = enabled\n',                     f.next())
-            self.assertEqual('\n',                                   f.next())
+            assert f.next() == '# -*- coding: utf-8 -*-\n'
+            assert f.next() == '\n'
+            assert f.next() == '[résumé]\n'
+            assert f.next() == 'bláh = Blàh!\n'
+            assert f.next() == 'chöicé = -42\n'
+            assert f.next() == 'fálsé = disabled\n'
+            assert f.next() == 'liśt = #ccö|4.2|42|0||enabled|disabled|\n'
+            assert f.next() == 'nöné = \n'
+            assert f.next() == 'trüé = enabled\n'
+            assert f.next() == '\n'
             self.assertRaises(StopIteration, f.next)
 
     def test_option_with_non_normal_default(self):
@@ -821,11 +818,11 @@ class TestIntegration(BaseTest):
         config = self._read()
         config.set_defaults()
         config.save()
-        self.assertEqual(expected, readlines(self.filename))
+        assert readlines(self.filename) == expected
 
         config.set('a', 'bool-1', 'True')
         config.save()
-        self.assertEqual(expected, readlines(self.filename))
+        assert readlines(self.filename) == expected
 
     def test_save_changes_mtime(self):
         """Test that each save operation changes the file modification time."""
@@ -840,7 +837,7 @@ class TestIntegration(BaseTest):
         time.sleep(1.0 - time_now() % 1.0)
         sconfig.save()
         rconfig.parse_if_needed()
-        self.assertEqual(2, rconfig.getint('section', 'option'))
+        assert rconfig.getint('section', 'option') == 2
 
     def test_touch_changes_mtime(self):
         """Test that each touch command changes the file modification time."""
@@ -873,9 +870,10 @@ class ConfigurationSetDefaultsTestCase(BaseTest):
         config.save()
 
         with open(self.filename, 'r') as f:
-            self.assertEqual('# -*- coding: utf-8 -*-\n', f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertRaises(StopIteration, f.next)
+            assert f.next() == '# -*- coding: utf-8 -*-\n'
+            assert f.next() == '\n'
+            with pytest.raises(StopIteration):
+                f.next()
 
     def test_component_class_no_match(self):
         """No defaults written if module doesn't match."""
@@ -884,9 +882,10 @@ class ConfigurationSetDefaultsTestCase(BaseTest):
         config.save()
 
         with open(self.filename, 'r') as f:
-            self.assertEqual('# -*- coding: utf-8 -*-\n', f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertRaises(StopIteration, f.next)
+            assert f.next() == '# -*- coding: utf-8 -*-\n'
+            assert f.next() == '\n'
+            with pytest.raises(StopIteration):
+                f.next()
 
     def test_component_module_match(self):
         """Defaults of components in matching module are written."""
@@ -895,17 +894,18 @@ class ConfigurationSetDefaultsTestCase(BaseTest):
         config.save()
 
         with open(self.filename, 'r') as f:
-            self.assertEqual('# -*- coding: utf-8 -*-\n', f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertEqual('[compa]\n',                 f.next())
-            self.assertEqual('opt1 = 1\n',                f.next())
-            self.assertEqual('opt2 = a\n',                f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertEqual('[compb]\n',                 f.next())
-            self.assertEqual('opt3 = 2\n',                f.next())
-            self.assertEqual('opt4 = b\n',                f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertRaises(StopIteration, f.next)
+            assert f.next() == '# -*- coding: utf-8 -*-\n'
+            assert f.next() == '\n'
+            assert f.next() == '[compa]\n'
+            assert f.next() == 'opt1 = 1\n'
+            assert f.next() == 'opt2 = a\n'
+            assert f.next() == '\n'
+            assert f.next() == '[compb]\n'
+            assert f.next() == 'opt3 = 2\n'
+            assert f.next() == 'opt4 = b\n'
+            assert f.next() == '\n'
+            with pytest.raises(StopIteration):
+                f.next()
 
     def test_component_module_wildcard_match(self):
         """Defaults of components in matching module are written.
@@ -916,17 +916,18 @@ class ConfigurationSetDefaultsTestCase(BaseTest):
         config.save()
 
         with open(self.filename, 'r') as f:
-            self.assertEqual('# -*- coding: utf-8 -*-\n', f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertEqual('[compa]\n',                 f.next())
-            self.assertEqual('opt1 = 1\n',                f.next())
-            self.assertEqual('opt2 = a\n',                f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertEqual('[compb]\n',                 f.next())
-            self.assertEqual('opt3 = 2\n',                f.next())
-            self.assertEqual('opt4 = b\n',                f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertRaises(StopIteration, f.next)
+            assert f.next() == '# -*- coding: utf-8 -*-\n'
+            assert f.next() == '\n'
+            assert f.next() == '[compa]\n'
+            assert f.next() == 'opt1 = 1\n'
+            assert f.next() == 'opt2 = a\n'
+            assert f.next() == '\n'
+            assert f.next() == '[compb]\n'
+            assert f.next() == 'opt3 = 2\n'
+            assert f.next() == 'opt4 = b\n'
+            assert f.next() == '\n'
+            with pytest.raises(StopIteration):
+                f.next()
 
     def test_component_class_match(self):
         """Defaults of matching component are written."""
@@ -935,13 +936,14 @@ class ConfigurationSetDefaultsTestCase(BaseTest):
         config.save()
 
         with open(self.filename, 'r') as f:
-            self.assertEqual('# -*- coding: utf-8 -*-\n', f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertEqual('[compa]\n',                 f.next())
-            self.assertEqual('opt1 = 1\n',                f.next())
-            self.assertEqual('opt2 = a\n',                f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertRaises(StopIteration, f.next)
+            assert f.next() == '# -*- coding: utf-8 -*-\n'
+            assert f.next() == '\n'
+            assert f.next() == '[compa]\n'
+            assert f.next() == 'opt1 = 1\n'
+            assert f.next() == 'opt2 = a\n'
+            assert f.next() == '\n'
+            with pytest.raises(StopIteration):
+                f.next()
 
     def test_component_no_overwrite(self):
         """Values in configuration are not overwritten."""
@@ -952,13 +954,14 @@ class ConfigurationSetDefaultsTestCase(BaseTest):
         config.save()
 
         with open(self.filename, 'r') as f:
-            self.assertEqual('# -*- coding: utf-8 -*-\n', f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertEqual('[compa]\n',                 f.next())
-            self.assertEqual('opt1 = 3\n',                f.next())
-            self.assertEqual('opt2 = a\n',                f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertRaises(StopIteration, f.next)
+            assert f.next() == '# -*- coding: utf-8 -*-\n'
+            assert f.next() == '\n'
+            assert f.next() == '[compa]\n'
+            assert f.next() == 'opt1 = 3\n'
+            assert f.next() == 'opt2 = a\n'
+            assert f.next() == '\n'
+            with pytest.raises(StopIteration):
+                f.next()
 
     def test_component_no_overwrite_parent(self):
         """Values in parent configuration are not overwritten."""
@@ -973,20 +976,22 @@ class ConfigurationSetDefaultsTestCase(BaseTest):
         config.save()
 
         with open(self.sitename, 'r') as f:
-            self.assertEqual('# -*- coding: utf-8 -*-\n', f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertEqual('[compa]\n',                 f.next())
-            self.assertEqual('opt1 = 3\n',                f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertRaises(StopIteration, f.next)
+            assert f.next() == '# -*- coding: utf-8 -*-\n'
+            assert f.next() == '\n'
+            assert f.next() == '[compa]\n'
+            assert f.next() == 'opt1 = 3\n'
+            assert f.next() == '\n'
+            with pytest.raises(StopIteration):
+                f.next()
 
         with open(self.filename, 'r') as f:
-            self.assertEqual('# -*- coding: utf-8 -*-\n', f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertEqual('[compa]\n',                 f.next())
-            self.assertEqual('opt2 = a\n',                f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertEqual('[inherit]\n',               f.next())
-            self.assertEqual('file = trac-site.ini\n',    f.next())
-            self.assertEqual('\n',                        f.next())
-            self.assertRaises(StopIteration, f.next)
+            assert f.next() == '# -*- coding: utf-8 -*-\n'
+            assert f.next() == '\n'
+            assert f.next() == '[compa]\n'
+            assert f.next() == 'opt2 = a\n'
+            assert f.next() == '\n'
+            assert f.next() == '[inherit]\n'
+            assert f.next() == 'file = trac-site.ini\n'
+            assert f.next() == '\n'
+            with pytest.raises(StopIteration):
+                f.next()
