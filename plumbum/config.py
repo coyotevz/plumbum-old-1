@@ -7,8 +7,8 @@ from configparser import ConfigParser, ParsingError
 from inspect import cleandoc
 
 from plumbum.core import PlumbumError, ComponentMeta, ExtensionPoint
-from plumbum.util import AtomicFile, as_bool
-from plumbum.util.compat import wait_for_file_mtime_change
+from plumbum.util import as_bool
+from plumbum.util.file import AtomicFile, wait_for_file_mtime_change
 
 
 _use_default = object()

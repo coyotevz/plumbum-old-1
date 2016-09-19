@@ -5,6 +5,7 @@ import os
 import errno
 import time
 import random
+import tempfile
 
 
 can_rename_open_file = False
@@ -107,3 +108,71 @@ def wait_for_file_mtime_change(filename):
             touch_file(filename)
     except OSError:
         pass  # file doesn't exist yet
+
+
+class AtomicFile(object):
+    """A file that appears atomically with its full content.
+
+    This file-like object writes to a temporary file in the same directory as
+    the final file. If the file is commited, the temporary file is renamed
+    atomically (on Unix, at least) to its final name. If it is rolled back, the
+    temporary file is removed.
+    """
+    def __init__(self, path, mode='w', bufsize=-1):
+        self._file = None
+        self._path = os.path.realpath(path)
+        dir, name = os.path.split(self._path)
+        fd, self._temp = tempfile.mkstemp(prefix=name + '-', dir=dir)
+        self._file = os.fdopen(fd, mode, bufsize)
+
+        # Try to preserve permissions and group ownership, but failure should
+        # not be fatal
+        try:
+            st = os.stat(self._path)
+            if hasattr(os, 'chmod'):
+                os.chmod(self._temp, st.st_mode)
+            if hasattr(os, 'chflags') and hasattr(st, 'st_flags'):
+                os.chflags(self._temp, st.st_flags)
+            if hasattr(os, 'chown'):
+                os.chown(self._temp, -1, st.st_gid)
+        except OSError:
+            pass
+
+    def __getattr__(self, name):
+        return getattr(self._file, name)
+
+    def commit(self):
+        if self._file is None:
+            return
+        try:
+            f, self._file = self._file, None
+            f.close()
+            rename(self._temp, self._path)
+        except Exception:
+            os.unlink(self._temp)
+            raise
+
+    def rollback(self):
+        if self._file is None:
+            return
+        try:
+            f, self._file = self._file, None
+            f.close()
+        finally:
+            try:
+                os.unlink(self._temp)
+            except Exception:
+                pass
+
+    close = commit
+    __del__ = rollback
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+    @property
+    def closed(self):
+        return self._file is None or self._file.closed
