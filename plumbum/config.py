@@ -789,12 +789,15 @@ class OrderedExtensionsOption(ListOption):
             "the Component is enabled or update the option {} in "
             "plumbum.ini.".format(iface, implem, option))
 
-        def compare(x, y):
+        def compare_old(x, y):
             x, y = x.__class__.__name__, y.__class__.__name__
             if x not in order:
                 return int(y in order)
             if y not in order:
                 return -int(x in order)
             return cmp(order.index(x), order.index(y))
-        components.sort(compare)
+
+        def compare(x):
+            return x.__class__.__name__
+        components.sort(key=compare)
         return components
