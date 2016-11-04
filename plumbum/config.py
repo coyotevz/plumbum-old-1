@@ -513,6 +513,43 @@ def _get_registry(cls, compmgr=None):
                 components or compmgr.is_enabled(components[each[1]]))
 
 
+class ConfigSection(object):
+    """Descriptor for configuration sections."""
+
+    registry = {}
+
+    @staticmethod
+    def get_registry(compmgr=None):
+        """Return the section registry, as a `dict` mapping section names to
+        `ConfigSection` objects.
+
+        If `compmgr` is specified, only return sections for components that are
+        enabled in the given `ComponentManager`.
+        """
+        return _get_registry(ConfigSection, compmgr)
+
+    def __init__(self, name, doc, doc_domain='plumbumini', doc_args=None):
+        """Create the configuration section."""
+        self.name = name
+        self.registry[self.name] = self
+        self.__doc__ = cleandoc(doc)
+        self.doc_domain = doc_domain
+        self.doc_args = doc_args
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        config = getattr(instance, 'config', None)
+        if config and isinstance(config, Configuration):
+            return config[self.name]
+
+    def __repr__(self):
+        return '<{} [{}]>'.format(self.__class__.__name__, self.name)
+
+    @property
+    def doc(self):
+        """Return localized document of the section"""
+        return _getdoc(self)
 
 
 def _dumps(value):

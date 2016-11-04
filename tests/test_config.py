@@ -132,20 +132,20 @@ class BaseTest(object):
         self._orig = {
             'ComponentMeta._components': ComponentMeta._components,
             'ComponentMeta._registry': ComponentMeta._registry,
-            #'ConfigSection.registry': ConfigSection.registry,
+            'ConfigSection.registry': ConfigSection.registry,
             'Option.registry': Option.registry,
         }
         ComponentMeta._components = list(ComponentMeta._components)
         ComponentMeta._registry = dict((interface, list(classes))
                                        for interface, classes
                                        in ComponentMeta._registry.items())
-        #ConfigSection.registry = {}
+        ConfigSection.registry = {}
         Option.registry = {}
 
     def tardown_method(self, method):
         ComponentMeta._components = self._orig['ComponentMeta._components']
         ComponentMeta._registry = self._orig['ComponentMeta._registry']
-        #ConfigSection.registry = self._orig['ConfigSection.registry']
+        ConfigSection.registry = self._orig['ConfigSection.registry']
         Option.registry = self._orig['Option.registry']
         shutil.rmtree(self.tmpdir)
 
