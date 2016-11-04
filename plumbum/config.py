@@ -482,7 +482,7 @@ class Section(object):
         self._cache.pop(key, None)
         if not self.config.parser.has_section(self.name):
             self.config.parser.add_section(self.name)
-        return self.config.parser.set(self.name, key, value)
+        return self.config.parser.set(self.name, key, str(value) if value is not None else '')
 
     def remove(self, key):
         """Delete a key from this section.
