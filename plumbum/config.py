@@ -646,7 +646,7 @@ class ListOption(Option):
             sep = self.sep
             if isinstance(sep, (list, tuple)):
                 sep = sep[0]
-            return sep.join(Options.dump(self, v) or '' for v in value)
+            return sep.join(Option.dumps(self, v) or '' for v in value)
         return Option.dumps(self, value)
 
     def normalize(self, value):

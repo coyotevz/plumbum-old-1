@@ -14,6 +14,8 @@ from plumbum.core import Component, ComponentMeta, Interface, implements
 from plumbum.util.file import wait_for_file_mtime_change
 from plumbum.util.datefmt import time_now
 
+from plumbum.util.test import EnvironmentStub
+
 
 def create_file(path, data='', mode='w'):
     """Create a new file with the given data.
@@ -125,6 +127,7 @@ class BaseTest(object):
         self.tmpdir = mkdtemp()
         self.filename = os.path.join(self.tmpdir, 'plumbum-test.ini')
         self.sitename = os.path.join(self.tmpdir, 'plumbum-site.ini')
+        self.env = EnvironmentStub()
         self._write([])
         self._orig = {
             'ComponentMeta._components': ComponentMeta._components,
