@@ -4,11 +4,13 @@ import shutil
 import os
 import tempfile
 import time
+import contextlib
 
 import pytest
 from plumbum.config import (
     Configuration, ConfigurationError, Option, IntOption, BoolOption,
-    FloatOption, ListOption, ChoiceOption, PathOption, ExtensionOption
+    FloatOption, ListOption, ChoiceOption, PathOption, ExtensionOption,
+    OrderedExtensionsOption, ConfigSection
 )
 from plumbum.core import Component, ComponentMeta, Interface, implements
 from plumbum.util.file import wait_for_file_mtime_change
@@ -29,6 +31,12 @@ def create_file(path, data='', mode='w'):
                 f.write(data)
             else: # Assume iterable
                 f.writelines(data)
+
+
+def read_file(path, mode='r'):
+    """Read file and return its content."""
+    with open(path, mode) as f:
+        return f.read()
 
 
 def _write(filename, lines):
@@ -142,7 +150,7 @@ class BaseTest(object):
         ConfigSection.registry = {}
         Option.registry = {}
 
-    def tardown_method(self, method):
+    def teardown_method(self, method):
         ComponentMeta._components = self._orig['ComponentMeta._components']
         ComponentMeta._registry = self._orig['ComponentMeta._registry']
         ConfigSection.registry = self._orig['ConfigSection.registry']
@@ -155,6 +163,14 @@ class BaseTest(object):
     def _write(self, lines, site=False):
         filename = self.sitename if site else self.filename
         _write(filename, lines)
+
+    @contextlib.contextmanager
+    def inherited_file(self):
+        try:
+            self._write(['[inherit]', 'file = plumbum-site.ini'])
+            yield
+        finally:
+            os.remove(self.sitename)
 
 
 class TestIntegration(BaseTest):
@@ -386,12 +402,14 @@ class TestIntegration(BaseTest):
         self.env.enable_component(Foo)
 
         foo = Foo(self.env)
-        self.assertRaises(ConfigurationError, getattr, foo, 'default1')
-        self.assertIsInstance(foo.default2, ImplA)
-        self.assertRaises(ConfigurationError, getattr, foo, 'default3')
-        self.assertIsInstance(foo.option, ImplA)
-        self.assertIsInstance(foo.option2, ImplA)
-        self.assertRaises(ConfigurationError, getattr, foo, 'invalid')
+        with pytest.raises(ConfigurationError):
+            foo.default1
+        assert isinstance(foo.default2, ImplA)
+        with pytest.raises(ConfigurationError):
+            foo.default3
+        assert isinstance(foo.option, ImplA)
+        with pytest.raises(ConfigurationError):
+            foo.invalid
 
     def test_read_and_getorderedextensionsoption(self):
         self._write(['[a]', 'option = ImplA, ImplB',
@@ -431,18 +449,31 @@ class TestIntegration(BaseTest):
         self.env.enable_component(Foo)
 
         foo = Foo(self.env)
-        self.assertEqual([], foo.default1)
-        self.assertEqual(3, len(foo.default2))
-        self.assertIsInstance(foo.default2[0], ImplA)
-        self.assertIsInstance(foo.default2[1], ImplB)
-        self.assertIsInstance(foo.default2[2], ImplC)
-        self.assertEqual(2, len(foo.default3))
-        self.assertIsInstance(foo.default3[0], ImplB)
-        self.assertIsInstance(foo.default3[1], ImplC)
-        self.assertEqual(2, len(foo.option))
-        self.assertIsInstance(foo.option[0], ImplA)
-        self.assertIsInstance(foo.option[1], ImplB)
-        self.assertRaises(ConfigurationError, getattr, foo, 'invalid')
+        #self.assertEqual([], foo.default1)
+        assert foo.default1 == []
+        #self.assertEqual(3, len(foo.default2))
+        assert len(foo.default2) == 3
+        #self.assertIsInstance(foo.default2[0], ImplA)
+        assert isinstance(foo.default2[0], ImplA)
+        #self.assertIsInstance(foo.default2[1], ImplB)
+        assert isinstance(foo.default2[1], ImplB)
+        #self.assertIsInstance(foo.default2[2], ImplC)
+        assert isinstance(foo.default2[2], ImplC)
+        #self.assertEqual(2, len(foo.default3))
+        assert len(foo.default3) == 2
+        #self.assertIsInstance(foo.default3[0], ImplB)
+        assert isinstance(foo.default3[0], ImplB)
+        #self.assertIsInstance(foo.default3[1], ImplC)
+        assert isinstance(foo.default3[1], ImplC)
+        #self.assertEqual(2, len(foo.option))
+        assert len(foo.option) == 2
+        #self.assertIsInstance(foo.option[0], ImplA)
+        assert isinstance(foo.option[0], ImplA)
+        #self.assertIsInstance(foo.option[1], ImplB)
+        assert isinstance(foo.option[1], ImplB)
+        #self.assertRaises(ConfigurationError, getattr, foo, 'invalid')
+        with pytest.raises(ConfigurationError):
+            foo.invalid
 
     def test_getpath(self):
         base = os.path.dirname(self.filename)
@@ -450,20 +481,20 @@ class TestIntegration(BaseTest):
         config.set('a', 'path_a', os.path.join(base, 'here', 'absolute.txt'))
         config.set('a', 'path_b', 'thisdir.txt')
         config.set('a', 'path_c', os.path.join(os.pardir, 'parentdir.txt'))
-        self.assertEqual(os.path.join(base, 'here', 'absolute.txt'),
-                         config.getpath('a', 'path_a'))
-        self.assertEqual(os.path.join(base, 'thisdir.txt'),
-                         config.getpath('a', 'path_b'))
-        self.assertEqual(os.path.join(os.path.dirname(base), 'parentdir.txt'),
-                         config.getpath('a', 'path_c'))
+        assert config.getpath('a', 'path_a') == \
+               os.path.join(base, 'here', 'absolute.txt')
+        assert config.getpath('a', 'path_b') == \
+               os.path.join(base, 'thisdir.txt')
+        assert config.getpath('a', 'path_c') == \
+               os.path.join(os.path.dirname(base), 'parentdir.txt')
 
     def test_set_raises(self):
         class Foo(object):
             option = Option('a', 'option', 'value')
 
         f = Foo()
-        self.assertRaises(AttributeError, setattr, f, 'option',
-                          Option('a', 'option2', 'value2'))
+        with pytest.raises(AttributeError):
+            f.option = Option('a', 'option2', 'value2')
 
     def test_set_and_save(self):
         config = self._read()
@@ -478,33 +509,35 @@ class TestIntegration(BaseTest):
         section.set('öption2', None)
         # Note: the following would depend on the locale.getpreferredencoding()
         # config.set('a', 'option3', "Voil\xe0 l'\xe9t\xe9") # latin-1
-        self.assertEqual('x', config.get(u'aä', u'öption0'))
-        self.assertEqual(u"Voilà l'été", config.get(u'aä', 'option1'))
-        self.assertEqual(u"Voilà l'été", config.get(u'aä', 'option2'))
-        self.assertEqual('', config.get('b', 'option1'))
-        self.assertEqual('z', config.get(u'aä', 'öption1'))
-        self.assertEqual('', config.get(u'aä', 'öption2'))
+        assert config.get(u'aä', u'öption0') == 'x'
+        assert config.get(u'aä', 'option1') == "Voilà l'été"
+        assert config.get(u'aä', 'option2') == "Voilà l'été"
+        assert config.get('b', 'option1') == ''
+        assert config.get(u'aä', 'öption1') == 'z'
+        assert config.get(u'aä', 'öption2') == ''
         config.save()
 
-        self.assertEqual(['# -*- coding: utf-8 -*-\n',
-                          '\n',
-                          '[aä]\n',
-                          "option1 = Voilà l'été\n",
-                          "option2 = Voilà l'été\n",
-                          'öption0 = x\n',
-                          'öption1 = z\n',
-                          'öption2 = \n',
-                          # "option3 = VoilÃ  l'Ã©tÃ©\n",
-                          '\n',
-                          '[b]\n',
-                          'option1 = \n',
-                          'öption0 = y\n',
-                          '\n'], readlines(self.filename))
+        assert readlines(self.filename) == [
+            '# -*- coding: utf-8 -*-\n',
+            '\n',
+            '[aä]\n',
+            "option1 = Voilà l'été\n",
+            "option2 = Voilà l'été\n",
+            'öption0 = x\n',
+            'öption1 = z\n',
+            'öption2 = \n',
+            # "option3 = VoilÃ  l'Ã©tÃ©\n",
+            '\n',
+            '[b]\n',
+            'option1 = \n',
+            'öption0 = y\n',
+            '\n'
+        ]
         config2 = Configuration(self.filename)
-        self.assertEqual('x', config2.get(u'aä', u'öption0'))
-        self.assertEqual(u"Voilà l'été", config2.get(u'aä', 'option1'))
-        self.assertEqual(u"Voilà l'été", config2.get(u'aä', 'option2'))
-        # self.assertEqual(u"Voilà l'été", config2.get('a', 'option3'))
+        assert config2.get(u'aä', u'öption0') == 'x'
+        assert config2.get(u'aä', 'option1') == "Voilà l'été"
+        assert config2.get(u'aä', 'option2') == "Voilà l'été"
+        assert config2.get('a', 'option3') == "Voilà l'été"
 
     def test_set_and_save_inherit(self):
         with self.inherited_file():
@@ -512,24 +545,26 @@ class TestIntegration(BaseTest):
             config = self._read()
             config.set('a', 'option2', "Voilà l'été")  # UTF-8
             config.set('a', 'option1', u"Voilà l'été") # unicode
-            self.assertEqual('x', config.get('a', 'option'))
-            self.assertEqual(u"Voilà l'été", config.get('a', 'option1'))
-            self.assertEqual(u"Voilà l'été", config.get('a', 'option2'))
+            assert config.get('a', 'option') == 'x'
+            assert config.get('a', 'option1') == "Voilà l'été"
+            assert config.get('a', 'option2') == "Voilà l'été"
             config.save()
 
-            self.assertEqual(['# -*- coding: utf-8 -*-\n',
-                              '\n',
-                              '[a]\n',
-                              "option1 = Voilà l'été\n",
-                              "option2 = Voilà l'été\n",
-                              '\n',
-                              '[inherit]\n',
-                              "file = trac-site.ini\n",
-                              '\n'], readlines(self.filename))
+            assert readlines(self.filename) == [
+                '# -*- coding: utf-8 -*-\n',
+                '\n',
+                '[a]\n',
+                "option1 = Voilà l'été\n",
+                "option2 = Voilà l'été\n",
+                '\n',
+                '[inherit]\n',
+                "file = plumbum-site.ini\n",
+                '\n'
+            ]
             config2 = Configuration(self.filename)
-            self.assertEqual('x', config2.get('a', 'option'))
-            self.assertEqual(u"Voilà l'été", config2.get('a', 'option1'))
-            self.assertEqual(u"Voilà l'été", config2.get('a', 'option2'))
+            assert config2.get('a', 'option') == 'x'
+            assert config2.get('a', 'option1') == "Voilà l'été"
+            assert config2.get('a', 'option2') == "Voilà l'été"
 
     def test_set_and_save_inherit_remove_matching(self):
         """Options with values matching the inherited value are removed from
@@ -538,37 +573,37 @@ class TestIntegration(BaseTest):
         with self.inherited_file():
             self._write(['[a]', u'ôption = x'], site=True)
             config = self._read()
-            self.assertEqual('x', config.get('a', u'ôption'))
+            assert config.get('a', u'ôption') == 'x'
             config.save()
 
-            self.assertEqual(
+            assert read_file(self.filename) == (
                 '# -*- coding: utf-8 -*-\n'
                 '\n'
                 '[inherit]\n'
-                'file = trac-site.ini\n'
-                '\n', read_file(self.filename))
+                'file = plumbum-site.ini\n'
+                '\n')
 
             config.set('a', u'ôption', 'y')
             config.save()
 
-            self.assertEqual(
+            assert read_file(self.filename) == (
                 '# -*- coding: utf-8 -*-\n'
                 '\n'
                 '[a]\n'
                 'ôption = y\n'
                 '\n'
                 '[inherit]\n'
-                'file = trac-site.ini\n'
-                '\n', read_file(self.filename))
+                'file = plumbum-site.ini\n'
+                '\n')
 
             config.set('a', u'ôption', 'x')
             config.save()
-            self.assertEqual(
+            assert read_file(self.filename) == (
                 '# -*- coding: utf-8 -*-\n'
                 '\n'
                 '[inherit]\n'
-                'file = trac-site.ini\n'
-                '\n', read_file(self.filename))
+                'file = plumbum-site.ini\n'
+                '\n')
 
     def test_simple_remove(self):
         self._write(['[a]', 'option = x'])
@@ -576,125 +611,127 @@ class TestIntegration(BaseTest):
         config.get('a', 'option') # populates the cache
         config.set(u'aä', u'öption', u'öne')
         config.remove('a', 'option')
-        self.assertEqual('', config.get('a', 'option'))
+        assert config.get('a', 'option') == ''
         config.remove(u'aä', u'öption')
-        self.assertEqual('', config.get('aä', 'öption'))
+        assert config.get('aä', 'öption') == ''
         config.remove('a', 'option2') # shouldn't fail
         config.remove('b', 'option2') # shouldn't fail
 
     def test_sections(self):
         self._write(['[a]', 'option = x', '[b]', 'option = y'])
         config = self._read()
-        self.assertEqual(['a', 'b'], config.sections())
+        assert config.sections() == ['a', 'b']
 
         class Foo(object):
             # enclose in parentheses to avoid messages extraction
             section_c = (ConfigSection)('c', 'Doc for c')
             option_c = Option('c', 'option', 'value')
 
-        self.assertEqual(['a', 'b', 'c'], config.sections())
+        assert config.sections() == ['a', 'b', 'c']
         foo = Foo()
         foo.config = config
-        self.assertTrue(foo.section_c is config['c'])
-        self.assertEqual('value', foo.section_c.get('option'))
+        assert foo.section_c is config['c']
+        assert foo.section_c.get('option') == 'value'
 
     def test_sections_unicode(self):
         self._write([u'[aä]', u'öption = x', '[b]', 'option = y'])
         config = self._read()
-        self.assertEqual([u'aä', 'b'], config.sections())
+        assert config.sections() == [u'aä', 'b']
 
         class Foo(object):
             option_c = Option(u'cä', 'option', 'value')
 
-        self.assertEqual([u'aä', 'b', u'cä'], config.sections())
+        assert config.sections() == [u'aä', 'b', u'cä']
 
     def test_options(self):
         self._write(['[a]', 'option = x', '[b]', 'option = y'])
         config = self._read()
-        self.assertEqual(('option', 'x'), iter(config.options('a')).next())
-        self.assertEqual(('option', 'y'), iter(config.options('b')).next())
-        self.assertRaises(StopIteration, iter(config.options('c')).next)
-        self.assertEqual('option', iter(config['a']).next())
-        self.assertEqual('option', iter(config['b']).next())
-        self.assertRaises(StopIteration, iter(config['c']).next)
+        assert next(iter(config.options('a'))) == ('option', 'x')
+        assert next(iter(config.options('b'))) == ('option', 'y')
+        with pytest.raises(StopIteration):
+            next(iter(config.options('c')))
+        assert next(iter(config['a'])) == 'option'
+        assert next(iter(config['b'])) == 'option'
+        with pytest.raises(StopIteration):
+            next(iter(config['c']))
 
         class Foo(object):
             option_a = Option('a', 'b', 'c')
 
-        self.assertEqual([('option', 'x'), ('b', 'c')],
-                         list(config.options('a')))
+        assert list(config.options('a')) == [('option', 'x'), ('b', 'c')]
 
     def test_options_unicode(self):
         self._write([u'[ä]', u'öption = x', '[b]', 'option = y'])
         config = self._read()
-        self.assertEqual((u'öption', 'x'), iter(config.options(u'ä')).next())
-        self.assertEqual(('option', 'y'), iter(config.options('b')).next())
-        self.assertRaises(StopIteration, iter(config.options('c')).next)
-        self.assertEqual(u'öption', iter(config['ä']).next())
+        assert next(iter(config.options(u'ä'))) == (u'öption', 'x')
+        assert next(iter(config.options('b'))) == ('option', 'y')
+        with pytest.raises(StopIteration):
+            next(iter(config.options('c')))
+        assert next(iter(config['ä'])) == 'öption'
 
         class Foo(object):
             option_a = Option(u'ä', u'öption2', 'c')
 
-        self.assertEqual([(u'öption', 'x'), (u'öption2', 'c')],
-                         list(config.options(u'ä')))
+        assert list(config.options(u'ä')) == \
+               [(u'öption', 'x'), (u'öption2', 'c')]
 
     def test_has_option(self):
         config = self._read()
-        self.assertFalse(config.has_option('a', 'option'))
-        self.assertFalse('option' in config['a'])
+        assert config.has_option('a', 'option') is False
+        assert 'option' not in config['a']
         self._write(['[a]', 'option = x'])
         config = self._read()
-        self.assertTrue(config.has_option('a', 'option'))
-        self.assertTrue('option' in config['a'])
+        assert config.has_option('a', 'option')
+        assert 'option' in config['a']
 
         class Foo(object):
             option_a = Option('a', 'option2', 'x2')
 
-        self.assertTrue(config.has_option('a', 'option2'))
+        assert config.has_option('a', 'option2')
 
     def test_has_option_unicode(self):
         config = self._read()
-        self.assertFalse(config.has_option(u'ä', u'öption'))
-        self.assertFalse(u'öption' in config[u'ä'])
+        assert config.has_option(u'ä', u'öption') is False
+        assert 'öption' not in config[u'ä']
         self._write([u'[ä]', u'öption = x'])
         config = self._read()
-        self.assertTrue(config.has_option(u'ä', u'öption'))
-        self.assertTrue(u'öption' in config[u'ä'])
+        assert config.has_option(u'ä', u'öption')
+        assert u'öption' in config[u'ä']
 
         class Foo(object):
             option_a = Option(u'ä', u'öption2', 'x2')
 
-        self.assertTrue(config.has_option(u'ä', u'öption2'))
+        assert config.has_option(u'ä', u'öption2')
 
     def test_reparse(self):
         self._write(['[a]', 'option = x'])
         config = self._read()
-        self.assertEqual('x', config.get('a', 'option'))
+        assert config.get('a', 'option') == 'x'
 
         self._write(['[a]', 'option = y'])
         config.parse_if_needed()
-        self.assertEqual('y', config.get('a', 'option'))
+        assert config.get('a', 'option') == 'y'
 
     def test_inherit_reparse(self):
         with self.inherited_file():
             self._write(['[a]', 'option = x'], site=True)
             config = self._read()
-            self.assertEqual('x', config.get('a', 'option'))
+            assert config.get('a', 'option') == 'x'
 
             self._write(['[a]', 'option = y'], site=True)
             config.parse_if_needed()
-            self.assertEqual('y', config.get('a', 'option'))
+            assert config.get('a', 'option') == 'y'
 
     def test_inherit_one_level(self):
         with self.inherited_file():
             self._write(['[a]', 'option = x'], site=True)
             config = self._read()
-            self.assertEqual('x', config.get('a', 'option'))
-            self.assertEqual(['a', 'inherit'], config.sections())
+            assert config.get('a', 'option') == 'x'
+            assert config.sections() == ['a', 'inherit']
             config.remove('a', 'option') # Should *not* remove option in parent
-            self.assertEqual('x', config.get('a', 'option'))
-            self.assertEqual([('option', 'x')], list(config.options('a')))
-            self.assertTrue('a' in config)
+            assert config.get('a', 'option') == 'x'
+            assert list(config.options('a')) == [('option', 'x')]
+            assert 'a' in config
 
     def test_inherit_multiple(self):
         class Foo(object):
@@ -715,17 +752,16 @@ class TestIntegration(BaseTest):
                 self._write(['[inherit]',
                              'file = %s, %s' % (relsite1, relsite2)])
                 config = self._read()
-                self.assertEqual('x', config.get('a', 'option1'))
-                self.assertEqual('y', config.get('b', 'option2'))
-                self.assertEqual('1', config.get('c', 'option'))
-                self.assertEqual(os.path.join(base, 'site1'),
-                                 config.getpath('c', 'path1'))
-                self.assertEqual(os.path.join(base, 'site2'),
-                                 config.getpath('c', 'path2'))
-                self.assertEqual('',
-                                 config.getpath('c', 'path3'))
-                self.assertEqual(os.path.join(base, 'site4'),
-                                 config.getpath('c', 'path4', 'site4'))
+                assert config.get('a', 'option1') == 'x'
+                assert config.get('b', 'option2') == 'y'
+                assert config.get('c', 'option') == '1'
+                assert config.getpath('c', 'path1') == \
+                       os.path.join(base, 'site1')
+                assert config.getpath('c', 'path2') == \
+                       os.path.join(base, 'site2')
+                assert config.getpath('c', 'path3') == ''
+                assert config.getpath('c', 'path4', 'site4') == \
+                       os.path.join(base, 'site4')
             finally:
                 os.remove(site2)
                 os.rmdir(os.path.dirname(site2))
@@ -753,18 +789,19 @@ class TestIntegration(BaseTest):
         config.set_defaults()
         config.save()
         with open(self.filename, 'r') as f:
-            assert f.next() == '# -*- coding: utf-8 -*-\n'
-            assert f.next() == '\n'
-            assert f.next() == '[a]\n'
-            assert f.next() == 'blah = Blàh!\n'
-            assert f.next() == 'choice = -42\n'
-            assert f.next() == 'false = disabled\n'
-            assert f.next() == 'list = #cc0|4.2|42|0||enabled|disabled|\n'
-            assert f.next() == 'list-seps = #cc0,4.2,42,0,,enabled,disabled,\n'
-            assert f.next() == 'none = \n'
-            assert f.next() == 'true = enabled\n'
-            assert f.next() == '\n'
-            self.assertRaises(StopIteration, f.next)
+            assert next(f) == '# -*- coding: utf-8 -*-\n'
+            assert next(f) == '\n'
+            assert next(f) == '[a]\n'
+            assert next(f) == 'blah = Blàh!\n'
+            assert next(f) == 'choice = -42\n'
+            assert next(f) == 'false = disabled\n'
+            assert next(f) == 'list = #cc0|4.2|42|0||enabled|disabled|\n'
+            assert next(f) == 'list-seps = #cc0,4.2,42,0,,enabled,disabled,\n'
+            assert next(f) == 'none = \n'
+            assert next(f) == 'true = enabled\n'
+            assert next(f) == '\n'
+            with pytest.raises(StopIteration):
+                next(f)
 
     def test_unicode_option_with_raw_default(self):
         class Foo(object):
@@ -783,17 +820,18 @@ class TestIntegration(BaseTest):
         config.set_defaults()
         config.save()
         with open(self.filename, 'r') as f:
-            assert f.next() == '# -*- coding: utf-8 -*-\n'
-            assert f.next() == '\n'
-            assert f.next() == '[résumé]\n'
-            assert f.next() == 'bláh = Blàh!\n'
-            assert f.next() == 'chöicé = -42\n'
-            assert f.next() == 'fálsé = disabled\n'
-            assert f.next() == 'liśt = #ccö|4.2|42|0||enabled|disabled|\n'
-            assert f.next() == 'nöné = \n'
-            assert f.next() == 'trüé = enabled\n'
-            assert f.next() == '\n'
-            self.assertRaises(StopIteration, f.next)
+            assert next(f) == '# -*- coding: utf-8 -*-\n'
+            assert next(f) == '\n'
+            assert next(f) == '[résumé]\n'
+            assert next(f) == 'bláh = Blàh!\n'
+            assert next(f) == 'chöicé = -42\n'
+            assert next(f) == 'fálsé = disabled\n'
+            assert next(f) == 'liśt = #ccö|4.2|42|0||enabled|disabled|\n'
+            assert next(f) == 'nöné = \n'
+            assert next(f) == 'trüé = enabled\n'
+            assert next(f) == '\n'
+            with pytest.raises(StopIteration):
+                next(f)
 
     def test_option_with_non_normal_default(self):
         class Foo(object):

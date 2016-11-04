@@ -6,7 +6,7 @@ from plumbum.api import IEnvironmentSetupParticipant, ISystemInfoProvider
 from plumbum.core import (
     Component, ComponentManager, ExtensionPoint, implements
 )
-from plumbum.config import ConfigSection
+from plumbum.config import ConfigSection, Option, PathOption
 
 
 # Content of the VERSION file in the environment

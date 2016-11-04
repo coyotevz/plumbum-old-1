@@ -260,7 +260,7 @@ class Configuration(object):
         if changed:
             self.parents = self._get_parents()
         else:
-            for parent in self.parent:
+            for parent in self.parents:
                 changed |= parent.parse_if_needed(force=force)
 
         if changed:
@@ -751,3 +751,50 @@ class ExtensionOption(Option):
                 interface=self.xtnpt.interface.__name__,
                 implementation=value,
                 option="[{}] {}".format(self.section, self.name)))
+
+
+class OrderedExtensionsOption(ListOption):
+    """A comma separated, ordered, list of components implementing `interface`.
+    Can be empty.
+
+    If `include_missing` is true (the default) all components implementing the
+    interface are returned, with those specified by the option ordered first.
+    """
+
+    def __init__(self, section, name, interface, default=None,
+                 include_missing=True, doc='', doc_domain='plumbumini',
+                 doc_args=None):
+        ListOption.__init__(self, section, name, default, doc=doc,
+                            doc_domain=doc_domain, doc_args=doc_args)
+        self.xtnpt = ExtensionPoint(interface)
+        self.include_missing = include_missing
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        order = ListOption.__get__(self, instance, owner)
+        components = []
+        implementing_classes = []
+        for impl in self.xtnpt.extensions(instance):
+            implementing_classes.append(impl.__class__.__name__)
+            if self.include_missing or impl.__class__.__name__ in order:
+                components.append(impl)
+        not_found = sorted(set(order) - set(implementing_classes))
+        if not_found:
+            iface = self.xtnpt.interface.__name__
+            implem = (((', ' if idx != 0 else None), impl) for (idx, impl) in enumerate(not_found))
+            option = "[{}] {}".format(self.section, self.name)
+            raise ConfigurationError("Cannot find implementation(s) of the "
+            "{} interface named {}. Please check that "
+            "the Component is enabled or update the option {} in "
+            "plumbum.ini.".format(iface, implem, option))
+
+        def compare(x, y):
+            x, y = x.__class__.__name__, y.__class__.__name__
+            if x not in order:
+                return int(y in order)
+            if y not in order:
+                return -int(x in order)
+            return cmp(order.index(x), order.index(y))
+        components.sort(compare)
+        return components
