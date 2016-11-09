@@ -16,7 +16,7 @@ from plumbum.core import Component, ComponentMeta, Interface, implements
 from plumbum.util.file import wait_for_file_mtime_change
 from plumbum.util.datefmt import time_now
 
-from plumbum.util.test import EnvironmentStub
+from plumbum.util.test import InstanceStub
 
 
 def create_file(path, data='', mode='w'):
@@ -135,7 +135,7 @@ class BaseTest(object):
         self.tmpdir = mkdtemp()
         self.filename = os.path.join(self.tmpdir, 'plumbum-test.ini')
         self.sitename = os.path.join(self.tmpdir, 'plumbum-site.ini')
-        self.env = EnvironmentStub()
+        self.instance = InstanceStub()
         self._write([])
         self._orig = {
             'ComponentMeta._components': ComponentMeta._components,
@@ -397,10 +397,10 @@ class TestIntegration(BaseTest):
             def __init__(self):
                 self.config = config
 
-        self.env.enable_component(ImplA)
-        self.env.enable_component(Foo)
+        self.instance.enable_component(ImplA)
+        self.instance.enable_component(Foo)
 
-        foo = Foo(self.env)
+        foo = Foo(self.instance)
         with pytest.raises(ConfigurationError):
             foo.default1
         assert isinstance(foo.default2, ImplA)
@@ -441,12 +441,12 @@ class TestIntegration(BaseTest):
             def __init__(self):
                 self.config = config
 
-        self.env.enable_component(ImplA)
-        self.env.enable_component(ImplB)
-        self.env.enable_component(ImplC)
-        self.env.enable_component(Foo)
+        self.instance.enable_component(ImplA)
+        self.instance.enable_component(ImplB)
+        self.instance.enable_component(ImplC)
+        self.instance.enable_component(Foo)
 
-        foo = Foo(self.env)
+        foo = Foo(self.instance)
         #self.assertEqual([], foo.default1)
         assert foo.default1 == []
         #self.assertEqual(3, len(foo.default2))

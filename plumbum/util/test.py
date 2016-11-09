@@ -4,25 +4,25 @@ import os.path
 
 from plumbum.core import ComponentManager
 from plumbum.config import Configuration
-from plumbum.env import Environment
+from plumbum.instance import PlumbumInstance
 
 
-class EnvironmentStub(Environment):
-    """A stub of the plumbum.env.Environment class for testing."""
+class InstanceStub(PlumbumInstance):
+    """A stub of the plumbum.instance.Instance class for testing."""
 
     required = False
     abstract = True
 
     def __init__(self, default_data=False, enable=None, disable=None,
                  path=None, destroying=False):
-        """Construct a new Environment stub object.
+        """Construct a new Instance stub object.
 
         :param default_data: If True, populate the database with some defaults.
         :param enable: A list of components classes or name globs to activate
-                       in the stub environment.
+                       in the stub instance.
         :param disable: A list of component classes or name globs to deactivate
-                        in the stub environment.
-        :param path: The location of the environment in the file system. No
+                        in the stub instance.
+        :param path: The location of the instance in the file system. No
                      files or directories are created when specifying this
                      parameter.
         :param destroying: If True, the database will not be reset. This is
