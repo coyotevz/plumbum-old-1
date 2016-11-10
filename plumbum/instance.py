@@ -402,3 +402,43 @@ class PlumbumInstance(Component, ComponentManager):
             participant.upgrade_instance()
             # TODO: upgrade database
         return True
+
+
+class PlumbumInstanceSetup(Component):
+    """Manage automatic instance upgrades."""
+
+    required = True
+
+    implements(IInstanceSetupParticipant)
+
+    # IInstanceSetupParticipant methods
+
+    def instance_created(self):
+        """Insert default data into the dataabse."""
+        # TODO: insert default data to db
+        self._update_sample_config()
+
+    def instance_needs_upgrade(self):
+        # TODO: Check if db needs upgrade
+        return False
+
+    def upgrade_instance(self):
+        # TODO: upgrade db
+        self._update_sample_config()
+
+    # Internal methods
+
+    def _update_sample_config(self):
+        filename = os.path.join(self.instance.config_file_path + '.sample')
+        if not os.path.isfile(filename):
+            return
+        config = Configuration(filename)
+        for (section, name), option in Option.get_registry().items():
+            config.set(section, name, option.dumps(option.default))
+        try:
+            config.save()
+            self.log.info("Wrote sample configuration file with the new "
+                          "settings and their default values: %s" % filename)
+        except IOError as e:
+            self.log.warn("Could't write sample configuration file (%s)", e,
+                          exc_info=True)
