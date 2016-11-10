@@ -2,7 +2,6 @@
 
 import shutil
 import os
-import tempfile
 import time
 import contextlib
 
@@ -13,24 +12,10 @@ from plumbum.config import (
     OrderedExtensionsOption, ConfigSection
 )
 from plumbum.core import Component, ComponentMeta, Interface, implements
-from plumbum.util.file import wait_for_file_mtime_change
+from plumbum.util.file import create_file, wait_for_file_mtime_change
 from plumbum.util.datefmt import time_now
 
-from plumbum.util.test import InstanceStub
-
-
-def create_file(path, data='', mode='w'):
-    """Create a new file with the given data.
-
-    :data: string or iterable of strings.
-    """
-    with open(path, mode) as f:
-        if data:
-            # TODO: Encode data to utf-8
-            if isinstance(data, str):
-                f.write(data)
-            else: # Assume iterable
-                f.writelines(data)
+from tests.utils import InstanceStub, mkdtemp
 
 
 def read_file(path, mode='r'):
@@ -51,13 +36,6 @@ def _read(filename):
 def readlines(filename):
     with open(filename, 'r') as f:
         return f.readlines()
-
-
-def mkdtemp():
-    """Create a temp directory with prefix `pb-testdir-` and return the
-    directory name.
-    """
-    return os.path.realpath(tempfile.mkdtemp(prefix='pb-testdir-'))
 
 
 class TestConfiguration(object):
@@ -447,29 +425,17 @@ class TestIntegration(BaseTest):
         self.instance.enable_component(Foo)
 
         foo = Foo(self.instance)
-        #self.assertEqual([], foo.default1)
         assert foo.default1 == []
-        #self.assertEqual(3, len(foo.default2))
         assert len(foo.default2) == 3
-        #self.assertIsInstance(foo.default2[0], ImplA)
         assert isinstance(foo.default2[0], ImplA)
-        #self.assertIsInstance(foo.default2[1], ImplB)
         assert isinstance(foo.default2[1], ImplB)
-        #self.assertIsInstance(foo.default2[2], ImplC)
         assert isinstance(foo.default2[2], ImplC)
-        #self.assertEqual(2, len(foo.default3))
         assert len(foo.default3) == 2
-        #self.assertIsInstance(foo.default3[0], ImplB)
         assert isinstance(foo.default3[0], ImplB)
-        #self.assertIsInstance(foo.default3[1], ImplC)
         assert isinstance(foo.default3[1], ImplC)
-        #self.assertEqual(2, len(foo.option))
         assert len(foo.option) == 2
-        #self.assertIsInstance(foo.option[0], ImplA)
         assert isinstance(foo.option[0], ImplA)
-        #self.assertIsInstance(foo.option[1], ImplB)
         assert isinstance(foo.option[1], ImplB)
-        #self.assertRaises(ConfigurationError, getattr, foo, 'invalid')
         with pytest.raises(ConfigurationError):
             foo.invalid
 

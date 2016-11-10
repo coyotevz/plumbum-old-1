@@ -2,11 +2,19 @@
 
 """Plumbum Instance model and related APIs."""
 
+import os
+import hashlib
+
 from plumbum.api import IInstanceSetupParticipant, ISystemInfoProvider
 from plumbum.core import (
-    Component, ComponentManager, ExtensionPoint, implements
+    Component, ComponentManager, ExtensionPoint, implements, PlumbumError
 )
-from plumbum.config import ConfigSection, PathOption, Option, ChoiceOption
+from plumbum.config import (
+    ConfigSection, PathOption, Option, ChoiceOption,
+    Configuration, ConfigurationError
+)
+from plumbum.util import lazy, as_bool
+from plumbum.util.file import create_file
 from plumbum import log
 
 
@@ -110,10 +118,10 @@ class PlumbumInstance(Component, ComponentManager):
         """Custom logging format.
 
         If nothing is set, the folowing will be used:
-        
+
         `Plumbum[$(module)s] $(levelname)s: $(message)s`
 
-        In addition to regular key names supported by the 
+        In addition to regular key names supported by the
         [http://docs.python.org/library/logging.html Python logger library]
         one could use:
 
@@ -146,8 +154,251 @@ class PlumbumInstance(Component, ComponentManager):
 
         if create:
             self.create(options)
-            for setup_participant in self.setup_participant:
+            for setup_participant in self.setup_participants:
                 setup_participant.instance_created()
         else:
             self.verify()
             self.setup_config()
+
+    @lazy
+    def name(self):
+        """The instance name."""
+        return os.path.basename(self.path)
+
+    @property
+    def instance(self):
+        """Property returning the `Instance` object, which is often required
+        for functions and methods that take a `Component` instance."""
+        return self
+
+    @property
+    def system_info(self):
+        """List of `(name, version)` tuple describing the name and version
+        information of external packages used by Plumbum and plugins."""
+        info = []
+        for provider in self.system_info_providers:
+            info.extend(provider.get_system_info() or [])
+        return sorted(set(info),
+                      key=lambda name, ver: (name != 'Plumbum', name.lower())
+               )
+
+    # ISystemInfoProvider methods
+
+    def get_system_info(self):
+        yield 'Plumbum', self.plumbum_version
+        yield 'Python', sys.version
+        yield 'setuptools', setuptools.__version__
+        if pytz is not None:
+            yield 'pytz', pytz.__version__
+        if hasattr(self, 'webfrontend_version'):
+            yield self.webfrontend, self.webfrontend_version
+
+    def component_activated(self, component):
+        """Initialize additional member variables for components.
+
+        Every component activated through the `Instance` object gets three
+        member variabled: `instance` (the instance object), `config` (the
+        instance configuration) and `log` (a logger object)."""
+        component.instance = self
+        component.config = self.config
+        component.log = self.log
+
+    def _component_name(self, name_or_class):
+        name = name_or_class
+        if not isinstance(name_or_class, str):
+            name = name_or_class.__module__ + '.' + name_or_class.__name__
+        return name.lower()
+
+    @lazy
+    def _component_rules(self):
+        _rules = {}
+        for name, value in self.components_section.options():
+            name = name.rstrip('.*').lower()
+            _rules[name] = as_bool(value)
+        return _rules
+
+    def is_component_enabled(self, cls):
+        """Implemented to only allow activation of components that are not
+        disabled in the configuration.
+
+        This is called by the `ComponentManager` base class when a component is
+        about to be activated. If this method returns `False`, the component
+        does not get activated. If it returns `None`, the component only gets
+        activated if it is located in the `plugins` directory of the instance.
+        """
+        component_name = self._component_name(cls)
+
+        rules = self._component_rules
+        cname = component_name
+        while cname:
+            enabled = rules.get(cname)
+            if enabled is not None:
+                return enabled
+            idx = cname.rfind('.')
+            if idx < 0:
+                break
+            cname = cname[:idx]
+
+        # By default, all components in the plumbum package are enabled except
+        # tests
+        return component_name.startswith('plumbum.') and \
+                not component_name.startswith('plumbum.test.') and \
+                not component_name.startswith('plumbum.tests.') or None
+
+    def enable_component(self, cls):
+        """Enable a component or module."""
+        self._component_rules[self._component_name(cls)] = True
+        super(PlumbumInstance, self).enable_component(cls)
+
+    def verify(self):
+        """Verify that the provided path points to a valid Plumbum instance
+        directory."""
+        try:
+            tag = read_file(os.path.join(self.path, 'VERSION')).splitlines()[0]
+            if tag != _VERSION:
+                raise Exception("Unknown Plumbum instance type '%(type)s'" %\
+                                dict(type=tag))
+        except Exception as e:
+            raise PlumbumError("No Plumbum instance found at %(path)s\n"
+                               "%(e)s" % dict(path=self.path, e=e))
+
+    def shutdown(self, tid=None):
+        """Close the instance."""
+        # Must shutdown database manager, etc.
+        if tid is None:
+            log.shutdown(self.log)
+
+    def create(self, options=[]):
+        """Create the basic directory structure of the instance, initialize the
+        database and populate the configuration file with default values.
+
+        If options contains ('inherit', 'file'), default values will not be
+        loaded; they are expected to be provided by that file or other
+        options.
+        """
+        # Create the directory structure
+        if not os.path.exists(self.path):
+            os.mkdir(self.path)
+        os.mkdir(self.log_dir)
+        #os.mkdir(self.htdocs_dir)
+        os.mkdir(self.plugins_dir)
+
+        # Create a few files
+        create_file(os.path.join(self.path, 'VERSION'), _VERSION + '\n')
+        create_file(os.path.join(self.path, 'README'),
+                "This directory contains a Plumbum instance.\n"
+                "Visit http://pb.rioplomo.com/ for more information.\n")
+
+        # Setup the default configuration
+        os.mkdir(self.conf_dir)
+        create_file(self.config_file_path + '.sample')
+        config = Configuration(self.config_file_path)
+        for section, name, value in options:
+            config.set(section, name, value)
+        config.save()
+        self.setup_config()
+        if not any((section, option) == ('inherit', 'file')
+                   for section, option, value in options):
+            self.config.set_defaults(self)
+            self.config.save()
+
+        # Create the database
+
+    @lazy
+    def database_version(self):
+        """Returns the current version of the database."""
+        return False
+
+    @lazy
+    def plumbum_version(self):
+        """Returns the version of Plumbum."""
+        return '0.0-dev'
+
+    def setup_config(self):
+        """Load the configuration file."""
+        self.config = Configuration(self.config_file_path,
+                                    {'instname': self.name})
+        if not self.config.exists:
+            raise PlumbumError("The configuration file is not found at "
+                               "%(path)s" % dict(path=self.config_file_path))
+        self.setup_log()
+        #plugins_dir = self.shared_plugins_dir
+        #load_components(self, plugins_dir and (plugins_dir,))
+
+    @lazy
+    def config_file_path(self):
+        """Path of the plumbum.ini file."""
+        return os.path.join(self.conf_dir, 'plumbum.ini')
+
+    @lazy
+    def log_file_path(self):
+        """Path to the log file."""
+        if not os.path.isabs(self.log_file):
+            return os.path.join(self.log_dir, self.log_file)
+        return self.log_file
+
+    def _build_path(self, *dirs):
+        path = self.path
+        for dir in dirs:
+            path = os.path.join(path, dir)
+        return os.path.realpath(path)
+
+    @lazy
+    def conf_dir(self):
+        """Absolute path to the conf directory."""
+        return self._build_path('conf')
+
+    @lazy
+    def log_dir(self):
+        """Absolute path to the log directory."""
+        return self._build_path('log')
+
+    @lazy
+    def plugins_dir(self):
+        """Absolute path to the plugins directory."""
+        return self._build_path('plugins')
+
+    @lazy
+    def templates_dir(self):
+        """Absolute path to the templates directory."""
+        return self._build_path('templates')
+
+    def setup_log(self):
+        """Initialize the logging sub-system."""
+        format = self.log_format
+        if format:
+            format = format.replace('$(', '%(') \
+                           .replace('%(path)s', self.path) \
+                           .replace('%(basename)s', self.name) \
+                           .replace('%(name)s', self.instance_name)
+        logid = 'Plumbum.%s' % hashlib.sha1(self.path.encode('utf-8')).hexdigest()
+        self.log = log.logger_handler_factory(
+            self.log_type, self.log_file_path, self.log_level, logid,
+            format=format)
+        self.log.info('-' * 32 + ' instance startup [Plumbum %s] ' + '-' * 32,
+                      self.plumbum_version)
+
+    def needs_upgrade(self):
+        """Return whether the instance needs to be upgraded."""
+        for participant in self.setup_participants:
+            if participant.instance_needs_upgrade():
+                self.log.warn("Component %s requires instance upgrade" %\
+                              participant)
+                return True
+        return False
+
+    def upgrade(self, backup=False, backup_dest=None):
+        """Upgrade instance."""
+        upgraders = []
+        for participant in self.setup_participants:
+            if participant.instance_needs_upgrade():
+                upgraders.append(participant)
+        if not upgraders:
+            return
+
+        for participant in upgraders:
+            self.log.info("%s.%s upgrading..." % (participant.__module__,
+                          participant.__class__.__name__))
+            participant.upgrade_instance()
+            # TODO: upgrade database
+        return True

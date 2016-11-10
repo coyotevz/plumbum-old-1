@@ -48,7 +48,7 @@ def logger_handler_factory(logtype='syslog', logfile=None, level='WARNING',
         if logtype in ('file', 'stderr'):
             format = '%(asctime)s ' + format
     datefmt = '%X' if logtype == 'stderr' else ''
-    formatter = loggin.Formatter(format, datefmt)
+    formatter = logging.Formatter(format, datefmt)
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
 

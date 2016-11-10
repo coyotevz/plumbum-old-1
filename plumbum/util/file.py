@@ -176,3 +176,17 @@ class AtomicFile(object):
     @property
     def closed(self):
         return self._file is None or self._file.closed
+
+
+def create_file(path, data='', mode='w'):
+    """Create a new file with the given data.
+
+    :data: string or iterable of strings.
+    """
+    with open(path, mode) as f:
+        if data:
+            # TODO: Encode data to utf-8
+            if isinstance(data, str):
+                f.write(data)
+            else: # Assume iterable
+                f.writelines(data)

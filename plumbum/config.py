@@ -50,7 +50,7 @@ class ConfigurationError(PlumbumError):
 
 class Configuration(object):
 
-    def __init__(self, filename):
+    def __init__(self, filename, params={}):
         self.filename = filename
         self.parser = ConfigParser(strict=False)
         self.parents = []
