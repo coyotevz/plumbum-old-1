@@ -11,7 +11,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name = 'Plumbum',
-    version = '0.0a0',
+    version = '0.1.dev1',
     author = 'Augusto Roccasalva',
     author_email = 'augustoroccasalva@gmail.com',
     description = 'Extensible ERP Software',
@@ -33,5 +33,9 @@ setup(
     entry_points = """\
     [console_scripts]
     plumbum-admin = plumbum.commands:main
+
+    [plumbum.commands]
+    init = plumbum.commands.init:InitCommand
+    listusers = plumbum.commands.init:ListUsersCommand
     """
 )
