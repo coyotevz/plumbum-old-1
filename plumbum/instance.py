@@ -2,22 +2,18 @@
 
 """Plumbum Instance model and related APIs."""
 
-import os
 import hashlib
+import os
 import threading
 
-from plumbum.api import IInstanceSetupParticipant, ISystemInfoProvider
-from plumbum.core import (
-    Component, ComponentManager, ExtensionPoint, implements, PlumbumError
-)
-from plumbum.config import (
-    ConfigSection, PathOption, Option, ChoiceOption,
-    Configuration, ConfigurationError
-)
-from plumbum.util import lazy, as_bool
-from plumbum.util.file import create_file, read_file
 from plumbum import log
-
+from plumbum.api import IInstanceSetupParticipant, ISystemInfoProvider
+from plumbum.config import (ChoiceOption, ConfigSection, Configuration,
+                            ConfigurationError, Option, PathOption)
+from plumbum.core import (Component, ComponentManager, ExtensionPoint,
+                          PlumbumError, implements)
+from plumbum.util import as_bool, lazy
+from plumbum.util.file import create_file, read_file
 
 # Content of the VERSION file in the instance
 _VERSION = 'Plumbum Instance Version 1'

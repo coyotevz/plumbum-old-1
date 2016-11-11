@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 
-import os.path
 import copy
+import os.path
 import re
 from configparser import ConfigParser, ParsingError
 from inspect import cleandoc
 
-from plumbum.core import PlumbumError, ComponentMeta, ExtensionPoint
+from plumbum.core import ComponentMeta, ExtensionPoint, PlumbumError
 from plumbum.util import as_bool
 from plumbum.util.file import AtomicFile, wait_for_file_mtime_change
-
 
 _use_default = object()
 

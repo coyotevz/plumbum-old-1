@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
-import sys
-import os
 import errno
-import time
+import os
 import random
+import sys
 import tempfile
-
+import time
 
 can_rename_open_file = False
 if os.name == 'nt':

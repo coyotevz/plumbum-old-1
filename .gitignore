@@ -5,6 +5,8 @@
 *.egg-info
 *.manifest
 *.so
+build/
+dist/
 docs/_build
 downloads/
 eggs/

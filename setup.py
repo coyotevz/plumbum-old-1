@@ -10,13 +10,28 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='Plumbum',
-    version='0.0a0',
-    description='Extensible ERP Software',
-    long_description=long_description,
-    entry_points={
-        'console_scripts': [
-            'init=plumbum.commands:mian',
-        ],
-    }
+    name = 'Plumbum',
+    version = '0.0a0',
+    author = 'Augusto Roccasalva',
+    author_email = 'augustoroccasalva@gmail.com',
+    description = 'Extensible ERP Software',
+    long_description = long_description,
+    platforms = 'any',
+    license = 'MIT',
+
+    packages = find_packages(exclude=['tests']),
+
+    install_requires = [
+        'SQLAlchemy',
+        'psycopg2',
+    ],
+
+    extras_require = {
+        'test': ['pytest'],
+    },
+
+    entry_points = """\
+    [console_scripts]
+    plumbum-admin = plumbum.commands:main
+    """
 )
