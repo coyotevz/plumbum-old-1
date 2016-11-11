@@ -190,3 +190,9 @@ def create_file(path, data='', mode='w'):
                 f.write(data)
             else: # Assume iterable
                 f.writelines(data)
+
+
+def read_file(path, mode='r'):
+    """Read file and return its content."""
+    with open(path, mode) as f:
+        return f.read()

@@ -6,7 +6,7 @@ import pytest
 from configparser import ConfigParser
 
 from plumbum.core import PlumbumError, ComponentManager, Component, implements
-from plumbum.instance import PlumbumInstance
+from plumbum.instance import PlumbumInstance, open_instance
 from plumbum.config import ConfigurationError
 from plumbum.api import IInstanceSetupParticipant
 
@@ -33,7 +33,7 @@ def test_empty_instance():
     instance = InstanceCreatedWithoutData(path, create=True)
     assert instance.database_version is False
     instance.shutdown()
-    #shutil.rmtree(instance.path)
+    shutil.rmtree(instance.path)
 
 
 class TestPlumbumInstance(object):
@@ -45,7 +45,7 @@ class TestPlumbumInstance(object):
 
     def teardown_method(self):
         self.instance.shutdown()
-        #shutil.rmtree(self.instance.path)
+        shutil.rmtree(self.instance.path)
 
     def test_missing_configfile_raises_plumbum_error(self):
         """PlumbumError is raised when config file is missing."""
@@ -82,16 +82,16 @@ class TestPlumbumInstance(object):
         self.instance.config.save()
 
         assert self.instance.config.get('logging', 'log_level') == 'invalid'
-        #with pytest.raises(ConfigurationError):
-        #    open_instance(self.instance.path, True)
+        with pytest.raises(ConfigurationError):
+            open_instance(self.instance.path, True)
 
     def test_ivalid_log_type_raises_exception(self):
         self.instance.config.set('logging', 'log_type', 'invalid')
         self.instance.config.save()
 
         assert self.instance.config.get('logging', 'log_type') == 'invalid'
-        #with pytest.raises(ConfigurationError):
-        #    open_instance(self.instance.path, True)
+        with pytest.raises(ConfigurationError):
+            open_instance(self.instance.path, True)
 
     def test_upgrade_instance(self):
         """InstanceSetupParticipants are called only if instance_needs_upgrade

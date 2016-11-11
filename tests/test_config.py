@@ -12,16 +12,12 @@ from plumbum.config import (
     OrderedExtensionsOption, ConfigSection
 )
 from plumbum.core import Component, ComponentMeta, Interface, implements
-from plumbum.util.file import create_file, wait_for_file_mtime_change
+from plumbum.util.file import (
+    create_file, read_file, wait_for_file_mtime_change
+)
 from plumbum.util.datefmt import time_now
 
 from tests.utils import InstanceStub, mkdtemp
-
-
-def read_file(path, mode='r'):
-    """Read file and return its content."""
-    with open(path, mode) as f:
-        return f.read()
 
 
 def _write(filename, lines):

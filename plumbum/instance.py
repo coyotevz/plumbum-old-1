@@ -4,6 +4,7 @@
 
 import os
 import hashlib
+import threading
 
 from plumbum.api import IInstanceSetupParticipant, ISystemInfoProvider
 from plumbum.core import (
@@ -14,7 +15,7 @@ from plumbum.config import (
     Configuration, ConfigurationError
 )
 from plumbum.util import lazy, as_bool
-from plumbum.util.file import create_file
+from plumbum.util.file import create_file, read_file
 from plumbum import log
 
 
@@ -312,7 +313,8 @@ class PlumbumInstance(Component, ComponentManager):
     @lazy
     def plumbum_version(self):
         """Returns the version of Plumbum."""
-        return '0.0-dev'
+        from plumbum import __version__
+        return __version__
 
     def setup_config(self):
         """Load the configuration file."""
@@ -442,3 +444,53 @@ class PlumbumInstanceSetup(Component):
         except IOError as e:
             self.log.warn("Could't write sample configuration file (%s)", e,
                           exc_info=True)
+
+
+inst_cache = {}
+inst_cache_lock = threading.Lock()
+
+
+def open_instance(path=None, use_cache=False):
+    """Open an existing instance object, and verify that the database is up to
+    date.
+
+    :param path: absolute path to the instance directory; if omitted the value
+                 of the `PLUMBUM_INSTANCE` environment variable is used
+    :param use_cache: whether the instance shoud be cached for subsequent
+                      invocations of the function
+    :return: the `PlumbumInstance` object
+    """
+    if not path:
+        path = os.getenv('PLUMBUM_INSTANCE')
+    if not path:
+        raise PlumbumError('Missing environment variable `PLUMBUM_INSTANCE`.'
+                'Plumbum requires this variable to point to a valid Plumbum '
+                'instance.')
+
+    if use_cache:
+        with inst_cache_lock:
+            inst = inst_cache.get(path)
+            if inst and inst.config.parse_if_needed():
+                # The instance configuration has changed, so shut it down and
+                # remove it from the cache so that it gets reinitialized
+                inst.log.info('Reloading instance due to configuration change')
+                inst.shutdown()
+                del inst_cache[path]
+                inst = None
+            if inst is None:
+                inst = inst_cache.setdefault(path, open_instance(path))
+            else:
+                CacheManager(inst).reset_metadata()
+    else:
+        inst = PlumbumInstance(path)
+        needs_upgrade = False
+        try:
+            needs_upgrade = inst.needs_upgrade()
+        except Exception as e: # e.g. no database connection
+            inst.log.error('Exception cought while checking for upgrade: %s',
+                           str(e))
+        if needs_upgrade:
+            raise PlumbumError('The Plumbum Instance needs to be upgraded.\n\n'
+                               'Run "plumbum-admin %(path)s upgrade"' % \
+                               dict(path=path))
+    return env
