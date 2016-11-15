@@ -325,8 +325,8 @@ class PlumbumInstance(Component, ComponentManager):
 
     @lazy
     def config_file_path(self):
-        """Path of the plumbum.ini file."""
-        return os.path.join(self.conf_dir, 'plumbum.ini')
+        """Path of the plumbum.cfg file."""
+        return os.path.join(self.conf_dir, 'plumbum.cfg')
 
     @lazy
     def log_file_path(self):

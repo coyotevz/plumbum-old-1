@@ -107,8 +107,8 @@ class BaseTest(object):
 
     def setup_method(self, method):
         self.tmpdir = mkdtemp()
-        self.filename = os.path.join(self.tmpdir, 'plumbum-test.ini')
-        self.sitename = os.path.join(self.tmpdir, 'plumbum-site.ini')
+        self.filename = os.path.join(self.tmpdir, 'plumbum-test.cfg')
+        self.sitename = os.path.join(self.tmpdir, 'plumbum-site.cfg')
         self.instance = InstanceStub()
         self._write([])
         self._orig = {
@@ -141,7 +141,7 @@ class BaseTest(object):
     @contextlib.contextmanager
     def inherited_file(self):
         try:
-            self._write(['[inherit]', 'file = plumbum-site.ini'])
+            self._write(['[inherit]', 'file = plumbum-site.cfg'])
             yield
         finally:
             os.remove(self.sitename)
@@ -215,16 +215,16 @@ class TestIntegration(BaseTest):
     def test_default_path(self):
         config = self._read()
         class Foo(object):
-            option_a = PathOption('a', 'opt1', 'file.ini')
-            option_b = PathOption('a', 'opt2', '/somewhere/file.ini')
-        assert config.get('a', 'opt1') == 'file.ini'
-        assert config.getpath('a', 'opt1') != 'file.ini'
+            option_a = PathOption('a', 'opt1', 'file.cfg')
+            option_b = PathOption('a', 'opt2', '/somewhere/file.cfg')
+        assert config.get('a', 'opt1') == 'file.cfg'
+        assert config.getpath('a', 'opt1') != 'file.cfg'
         assert os.path.isabs(config.getpath('a', 'opt1')) is True
         assert os.path.splitdrive(config.getpath('a', 'opt2'))[1]\
-                .replace('\\', '/') == '/somewhere/file.ini'
-        assert os.path.splitdrive(config.getpath('a', 'opt3', '/none.ini'))[1]\
-                .replace('\\', '/') == '/none.ini'
-        assert config.getpath('a', 'opt3', 'none.ini') != 'none.ini'
+                .replace('\\', '/') == '/somewhere/file.cfg'
+        assert os.path.splitdrive(config.getpath('a', 'opt3', '/none.cfg'))[1]\
+                .replace('\\', '/') == '/none.cfg'
+        assert config.getpath('a', 'opt3', 'none.cfg') != 'none.cfg'
 
     def test_read_and_get(self):
         self._write(['[a]', 'option = x'])
@@ -518,7 +518,7 @@ class TestIntegration(BaseTest):
                 "option2 = Voilà l'été\n",
                 '\n',
                 '[inherit]\n',
-                "file = plumbum-site.ini\n",
+                "file = plumbum-site.cfg\n",
                 '\n'
             ]
             config2 = Configuration(self.filename)
@@ -540,7 +540,7 @@ class TestIntegration(BaseTest):
                 '# -*- coding: utf-8 -*-\n'
                 '\n'
                 '[inherit]\n'
-                'file = plumbum-site.ini\n'
+                'file = plumbum-site.cfg\n'
                 '\n')
 
             config.set('a', u'ôption', 'y')
@@ -553,7 +553,7 @@ class TestIntegration(BaseTest):
                 'ôption = y\n'
                 '\n'
                 '[inherit]\n'
-                'file = plumbum-site.ini\n'
+                'file = plumbum-site.cfg\n'
                 '\n')
 
             config.set('a', u'ôption', 'x')
@@ -562,7 +562,7 @@ class TestIntegration(BaseTest):
                 '# -*- coding: utf-8 -*-\n'
                 '\n'
                 '[inherit]\n'
-                'file = plumbum-site.ini\n'
+                'file = plumbum-site.cfg\n'
                 '\n')
 
     def test_simple_remove(self):
@@ -696,9 +696,9 @@ class TestIntegration(BaseTest):
         class Foo(object):
             option_b = Option('b', 'option2', 'default')
         base = os.path.dirname(self.filename)
-        relsite1 = os.path.join('sub1', 'trac-site1.ini')
+        relsite1 = os.path.join('sub1', 'trac-site1.cfg')
         site1 = os.path.join(base, relsite1)
-        relsite2 = os.path.join('sub2', 'trac-site2.ini')
+        relsite2 = os.path.join('sub2', 'trac-site2.cfg')
         site2 = os.path.join(base, relsite2)
         os.mkdir(os.path.dirname(site1))
         create_file(site1, '[a]\noption1 = x\n'
@@ -966,7 +966,7 @@ class ConfigurationSetDefaultsTestCase(BaseTest):
         parent_config.set('compa', 'opt1', 3)
         parent_config.save()
         config = self._read()
-        config.set('inherit', 'file', 'trac-site.ini')
+        config.set('inherit', 'file', 'trac-site.cfg')
         config.save()
         config.parse_if_needed(True)
         config.set_defaults(component='trac.tests.config.CompA')
@@ -988,7 +988,7 @@ class ConfigurationSetDefaultsTestCase(BaseTest):
             assert f.next() == 'opt2 = a\n'
             assert f.next() == '\n'
             assert f.next() == '[inherit]\n'
-            assert f.next() == 'file = trac-site.ini\n'
+            assert f.next() == 'file = trac-site.cfg\n'
             assert f.next() == '\n'
             with pytest.raises(StopIteration):
                 f.next()

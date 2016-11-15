@@ -527,7 +527,7 @@ class ConfigSection(object):
         """
         return _get_registry(ConfigSection, compmgr)
 
-    def __init__(self, name, doc, doc_domain='plumbumini', doc_args=None):
+    def __init__(self, name, doc, doc_domain='plumbumcfg', doc_args=None):
         """Create the configuration section."""
         self.name = name
         self.registry[self.name] = self
@@ -580,7 +580,7 @@ class Option(object):
         return _get_registry(Option, compmgr)
 
     def __init__(self, section, name, default=None, doc='',
-                 doc_domain='plumbumini', doc_args=None):
+                 doc_domain='plumbumcfg', doc_args=None):
         """Create the configuration option.
 
         @param section: the name of the configuration section this options
@@ -668,7 +668,7 @@ class ListOption(Option):
     separated by a specific character.
     """
     def __init__(self, section, name, default=None, sep=',', keep_empty=False,
-                 doc='', doc_domain='plumbumini', doc_args=None):
+                 doc='', doc_domain='plumbumcfg', doc_args=None):
         self.sep = sep
         self.keep_empty = keep_empty
         Option.__init__(self, section, name, default, doc, doc_domain,
@@ -696,7 +696,7 @@ class ChoiceOption(Option):
     The default value is the first choice in the list.
     """
 
-    def __init__(self, section, name, choices, doc='', doc_domain='plumbumini',
+    def __init__(self, section, name, choices, doc='', doc_domain='plumbumcfg',
                  doc_args=None):
         Option.__init__(self, section, name, str(choices[0]), doc, doc_domain,
                         doc_args)
@@ -731,7 +731,7 @@ class ExtensionOption(Option):
     """
 
     def __init__(self, section, name, interface, default=None, doc='',
-                 doc_domain='plumbumini', doc_args=None):
+                 doc_domain='plumbumcfg', doc_args=None):
         Option.__init__(self, section, name, default, doc, doc_domain,
                         doc_args)
         self.xtnpt = ExtensionPoint(interface)
@@ -761,7 +761,7 @@ class OrderedExtensionsOption(ListOption):
     """
 
     def __init__(self, section, name, interface, default=None,
-                 include_missing=True, doc='', doc_domain='plumbumini',
+                 include_missing=True, doc='', doc_domain='plumbumcfg',
                  doc_args=None):
         ListOption.__init__(self, section, name, default, doc=doc,
                             doc_domain=doc_domain, doc_args=doc_args)
@@ -786,7 +786,7 @@ class OrderedExtensionsOption(ListOption):
             raise ConfigurationError("Cannot find implementation(s) of the "
             "{} interface named {}. Please check that "
             "the Component is enabled or update the option {} in "
-            "plumbum.ini.".format(iface, implem, option))
+            "plumbum.cfg.".format(iface, implem, option))
 
         def compare_old(x, y):
             x, y = x.__class__.__name__, y.__class__.__name__

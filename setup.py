@@ -32,10 +32,11 @@ setup(
 
     entry_points = """\
     [console_scripts]
-    plumbum-admin = plumbum.commands:main
+    plumbum-admin = plumbum.admin.console:main
 
-    [plumbum.commands]
-    init = plumbum.commands.init:InitCommand
-    listusers = plumbum.commands.init:ListUsersCommand
+    [plumbum.plugins]
+    plumbum.about = plumbum.about
+    plumbum.admin.console = plumbum.admin.console
+    plumbum.xmlrpc = plumbum.xmlrpc
     """
 )
