@@ -52,6 +52,10 @@ def run(args):
 
     admin = PlumbumAdmin()
 
+    # FIXME: for partial test only
+    from plumbum.instance import PlumbumInstance
+    inst = PlumbumInstance('/home/augusto/pb-instance')
+
     return admin.onecmd("help")
 
 

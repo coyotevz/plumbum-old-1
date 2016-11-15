@@ -12,6 +12,7 @@ from plumbum.config import (ChoiceOption, ConfigSection, Configuration,
                             ConfigurationError, Option, PathOption)
 from plumbum.core import (Component, ComponentManager, ExtensionPoint,
                           PlumbumError, implements)
+from plumbum.loader import load_components
 from plumbum.util import as_bool, lazy
 from plumbum.util.file import create_file, read_file
 
@@ -320,8 +321,8 @@ class PlumbumInstance(Component, ComponentManager):
             raise PlumbumError("The configuration file is not found at "
                                "%(path)s" % dict(path=self.config_file_path))
         self.setup_log()
-        #plugins_dir = self.shared_plugins_dir
-        #load_components(self, plugins_dir and (plugins_dir,))
+        plugins_dir = self.shared_plugins_dir
+        load_components(self, plugins_dir and (plugins_dir,))
 
     @lazy
     def config_file_path(self):
