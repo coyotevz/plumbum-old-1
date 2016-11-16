@@ -37,6 +37,6 @@ setup(
     [plumbum.plugins]
     plumbum.about = plumbum.about
     plumbum.admin.console = plumbum.admin.console
-    plumbum.xmlrpc = plumbum.xmlrpc
+    plumbum.web.xmlrpc = plumbum.web.xmlrpc
     """
 )
