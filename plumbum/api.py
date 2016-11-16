@@ -45,3 +45,8 @@ class IInstanceSetupParticipant(Interface):
         steps of upgrade, it can decide to commit on its own after each
         successful step.
         """
+
+
+class IRoutesProvider(Interface):
+    # TODO: Implement
+    pass
