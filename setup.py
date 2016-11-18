@@ -33,6 +33,7 @@ setup(
     entry_points = """\
     [console_scripts]
     plumbum-admin = plumbum.admin.console:main
+    plumbum = plumbum.command.main:run
 
     [plumbum.plugins]
     plumbum.about = plumbum.about
